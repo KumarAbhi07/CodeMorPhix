@@ -4,6 +4,8 @@ import Navbar from "./components/Navbar";
 import CodeEditor from "./components/CodeEditor";
 import LanguageSelect from "./components/LanguageSelect";
 import ResultPanel from "./components/ResultPanel";
+import OptimizedResult from "./components/OptimizedResult";
+
 
 function App() {
   const [code, setCode] = useState("");
@@ -11,34 +13,29 @@ function App() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [optimized, setOptimized] = useState(null);
 
   const handleAnalyze = async () => {
-    if (!code.trim()) {
-      setError("Please enter code");
-      return;
-    }
+    const res = await axios.post("http://localhost:5000/analyze", {
+      code,
+      language,
+    });
 
-    setError("");
-    setLoading(true);
-    
-    try {
-      const res = await axios.post("http://localhost:5000/analyze", {
-        code,
-        language,
-      });
-      setResult(res.data);
-    } catch (err) {
-      console.error(err);
-      setError("Error analyzing code. Make sure backend is running on port 5000.");
-    } finally {
-      setLoading(false);
-    }
+    setResult(res.data);
+
+    const aiRes = await axios.post("http://localhost:5000/optimize", {
+      code,
+      language,
+      ...res.data,
+    });
+
+    setOptimized(aiRes.data);
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-white">
       <Navbar />
-      
+
       {/* Hero Section */}
       <div className="pt-16 pb-12 px-6 text-center">
         <div className="max-w-4xl mx-auto space-y-6">
@@ -47,10 +44,11 @@ function App() {
               AI-Powered Code Analysis
             </h1>
             <p className="text-gray-400 text-lg md:text-xl max-w-2xl mx-auto">
-              Detect time & space complexity, find bottlenecks, and get optimized code suggestions powered by AI
+              Detect time & space complexity, find bottlenecks, and get
+              optimized code suggestions powered by AI
             </p>
           </div>
-          
+
           {/* Stats Row */}
           <div className="flex justify-center gap-8 pt-4">
             <div className="text-center">
@@ -94,6 +92,8 @@ function App() {
           )}
 
           <ResultPanel result={result} />
+          <OptimizedResult optimized={optimized} />
+
         </div>
       </div>
     </div>
