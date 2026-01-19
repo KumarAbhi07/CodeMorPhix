@@ -16,20 +16,60 @@ function App() {
   const [optimized, setOptimized] = useState(null);
 
   const handleAnalyze = async () => {
-    const res = await axios.post("http://localhost:5000/analyze", {
-      code,
-      language,
-    });
+    if (!code.trim()) {
+      setError("Please enter some code.");
+      return;
+    }
 
-    setResult(res.data);
+    // Language detection
+    const detectLanguage = (code) => {
+      const hasJavaKeywords = /\b(public|private|protected|class|static|void)\b/.test(code);
+      const hasCppKeywords = /\b(#include|std::|cout|cin|namespace)\b/.test(code);
+      const hasPythonKeywords = /\b(def|import|from|elif)\b/.test(code);
+      const hasSemicolons = /;/.test(code);
+      const hasBraces = /\{|\}/.test(code);
+      
+      if (hasCppKeywords) return 'cpp';
+      if (hasJavaKeywords && hasSemicolons && hasBraces) return 'java';
+      if (hasPythonKeywords || (!hasSemicolons && !hasBraces)) return 'python';
+      return null;
+    };
 
-    const aiRes = await axios.post("http://localhost:5000/optimize", {
-      code,
-      language,
-      ...res.data,
-    });
+    const detectedLang = detectLanguage(code);
+    if (detectedLang && detectedLang !== language) {
+      const langNames = { python: 'Python', java: 'Java', cpp: 'C++' };
+      const errorMsg = `Code appears to be ${langNames[detectedLang]}, but you selected ${langNames[language]}. Please match the language.`;
+      setError(errorMsg);
+      alert(errorMsg);
+      return;
+    }
 
-    setOptimized(aiRes.data);
+    setLoading(true);
+    setError("");
+    setResult(null);
+    setOptimized(null);
+
+    try {
+      const analysisRes = await axios.post("http://localhost:5000/analyze", {
+        code,
+        language,
+      });
+
+      setResult(analysisRes.data);
+
+      const aiRes = await axios.post("http://localhost:5000/optimize", {
+        code,
+        language,
+        ...analysisRes.data,
+      });
+
+      setOptimized(aiRes.data);
+    } catch (err) {
+      console.error(err);
+      setError("Something went wrong. Check backend logs.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -69,7 +109,7 @@ function App() {
 
       {/* Main Content */}
       <div className="px-6 pb-12">
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="max-w-4xl mx-auto bg-gray-900/50 p-8 rounded-xl shadow-lg space-y-6 border border-gray-800">
           <LanguageSelect language={language} setLanguage={setLanguage} />
 
           <CodeEditor code={code} setCode={setCode} />
@@ -77,12 +117,13 @@ function App() {
           <button
             onClick={handleAnalyze}
             disabled={loading || !code.trim()}
-            className="relative group w-full disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`w-full px-8 py-3 rounded-lg font-bold text-lg transition ${
+              loading
+                ? "bg-gray-600 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}
           >
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-xl blur opacity-60 group-hover:opacity-100 transition duration-300 group-disabled:opacity-30"></div>
-            <div className="relative px-8 py-3 bg-slate-950 rounded-xl font-bold text-lg">
-              {loading ? "🔍 Analyzing..." : "⚡ Analyze Code"}
-            </div>
+            {loading ? "🔍 Analyzing..." : "⚡ Analyze Code"}
           </button>
 
           {error && (
@@ -92,10 +133,15 @@ function App() {
           )}
 
           <ResultPanel result={result} />
-          <OptimizedResult optimized={optimized} />
+          <OptimizedResult optimized={optimized} language={language} />
 
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="text-center text-gray-400 pb-6 text-sm">
+        Built with ❤️ by Abhimanyu | CodeMorphix
+      </footer>
     </div>
   );
 }

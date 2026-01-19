@@ -104,5 +104,5 @@ def analyze_code(code):
 
 
 if __name__ == "__main__":
-    code = sys.argv[1]
+    code = sys.stdin.read()
     print(json.dumps(analyze_code(code)))
